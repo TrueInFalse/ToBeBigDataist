@@ -1,7 +1,8 @@
 # ClickHouse
-##  0. [官方文档](https://clickhouse.com/docs/zh/use-cases)
 
 > **ClickHouse是为大规模、高并发、秒级查询而生的列式分析型数据库，凭借列存、压缩、并行、容错、物化视图等机制，在PB级数据分析场景中具备极强竞争力。**
+
+##  0. [官方文档](https://clickhouse.com/docs/zh/use-cases)
 
 
 ## 1. 基本概念  
