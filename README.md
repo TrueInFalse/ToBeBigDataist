@@ -13,7 +13,7 @@
 
 ## LeetCode简记
 
-### (SQL题目](LeetCode简记/SQL题目.md)
+### [SQL题目](LeetCode简记/SQL题目.md)
 
 ## 收录
 
