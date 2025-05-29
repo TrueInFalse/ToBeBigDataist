@@ -290,3 +290,209 @@ ORDER BY
 - **逻辑清晰：** 每一步只关注一个特定的事件类型。
 - **易于调试：** 如果结果不对，你可以单独检查 `UNION ALL` 前的两个子查询，看看它们的数据是否正确。
 - **可扩展性：** 如果未来需要添加更多事件类型（比如“退款”），你只需要再增加一个 `UNION ALL` 分支即可。
+
+
+
+## 1308.不同性别每日分数总计
+
+> 非常经典的“开窗函数”（窗口函数）入门题目，可借助该题目详细理解掌握开窗函数。
+
+### Code
+
+```mysql
+SELECT 
+    gender,
+    day,
+    SUM(score_points) OVER(PARTITION BY gender ORDER BY day) AS total
+FROM Scores
+ORDER BY gender,day
+```
+
+**简介**：传统聚合函数（如 `SUM()`、`COUNT()`、`AVG()` 等）在使用 `GROUP BY` 时，会将多行数据合并成一行，丢失了原始行的细节。而窗口函数则能让你在保留原始行结构的同时，完成复杂的聚合和分析。
+
+**基本语法结构**：
+
+```mysql
+<窗口函数名> ( [参数列表] ) OVER (
+    [ PARTITION BY <列名1>, <列名2>, ... ]
+    [ ORDER BY <列名3> [ASC|DESC], <列名4> [ASC|DESC], ... ]
+    [ <窗口框架> ]
+)
+```
+
+### 窗口函数
+
+窗口函数是 SQL 中一个非常强大的功能，它允许你在**与当前行相关的某个“窗口”内执行计算，而不会像 `GROUP BY` 那样将行折叠成单个输出行**。简单来说，它既能像聚合函数一样进行分组计算，又能保留原始数据的每一行，这使得它在数据分析中异常灵活。
+
+你可以把它想象成一个“滑动窗口”：对于结果集中的每一行，这个窗口都会定义一个或多组相关的行，然后在这个窗口内执行计算。
+
+
+在没有窗口函数之前，如果你想解决以下问题，可能需要复杂的子查询或自连接：
+
+- 计算每一行在总销售额中的占比。
+- 找出每个部门薪水最高的人。
+- 计算某个员工过去 N 个月的平均销售额。
+- 对数据进行排名。
+- 比较当前行与前一行或后一行的数据。
+
+传统聚合函数（如 `SUM()`、`COUNT()`、`AVG()` 等）在使用 `GROUP BY` 时，会将多行数据合并成一行，丢失了原始行的细节。而窗口函数则能让你在保留原始行结构的同时，完成复杂的聚合和分析。
+
+
+### 窗口函数示例
+
+假设我们有一个 `Employees` 表：
+
+| **employee_id** | **department** | **salary** | **hire_date** |
+| --------------- | -------------- | ---------- | ------------- |
+| 1               | HR             | 60000      | 2020-01-01    |
+| 2               | Sales          | 75000      | 2019-03-15    |
+| 3               | HR             | 65000      | 2021-06-01    |
+| 4               | Sales          | 75000      | 2018-09-01    |
+| 5               | Marketing      | 80000      | 2022-02-10    |
+| 6               | Marketing      | 80000      | 2022-02-10    |
+| 7               | HR             | 58000      | 2020-05-20    |
+| 8               | Sales          | 90000      | 2017-11-11    |
+
+#### eg1: 计算各部门平均薪水
+
+```mysql
+SELECT
+    employee_id,
+    department,
+    salary,
+    -- 在每个部门内部计算平均薪水，保留所有行
+    AVG(salary) OVER (PARTITION BY department) AS avg_department_salary
+FROM
+    Employees;
+```
+
+**结果：**
+
+| **employee_id** | **department** | **salary** | **avg_department_salary** |
+| --------------- | -------------- | ---------- | ------------------------- |
+| 1               | HR             | 60000      | 61000.00                  |
+| 3               | HR             | 65000      | 61000.00                  |
+| 7               | HR             | 58000      | 61000.00                  |
+| 5               | Marketing      | 80000      | 80000.00                  |
+| 6               | Marketing      | 80000      | 80000.00                  |
+| 2               | Sales          | 75000      | 80000.00                  |
+| 4               | Sales          | 75000      | 80000.00                  |
+| 8               | Sales          | 90000      | 80000.00                  |
+
+**解释**：`PARTITION BY department` 将数据按部门分成三个分区（HR, Sales, Marketing）。`AVG(salary)` 会在每个分区内部计算平均值，并将这个平均值填充到该分区的所有行中。
+
+#### eg2: 各部门内部按薪水排名
+
+```MySQL
+SELECT
+    employee_id,
+    department,
+    salary,
+    -- 排名函数：ROW_NUMBER, RANK, DENSE_RANK
+    ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn,
+    RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS rk,
+    DENSE_RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS drk
+FROM
+    Employees;
+```
+
+**结果（排序可能不同，取决于数据库）：**
+
+| **employee_id** | **department** | **salary** | **rn** | **rk** | **drk** |
+| --------------- | -------------- | ---------- | ------ | ------ | ------- |
+| 3               | HR             | 65000      | 1      | 1      | 1       |
+| 1               | HR             | 60000      | 2      | 2      | 2       |
+| 7               | HR             | 58000      | 3      | 3      | 3       |
+| 8               | Sales          | 90000      | 1      | 1      | 1       |
+| 2               | Sales          | 75000      | 2      | 2      | 2       |
+| 4               | Sales          | 75000      | 3      | 2      | 2       |
+| 5               | Marketing      | 80000      | 1      | 1      | 1       |
+| 6               | Marketing      | 80000      | 2      | 1      | 1       |
+
+- 解释
+
+  ：
+
+  - `PARTITION BY department`：首先按部门分组。
+  - `ORDER BY salary DESC`：在每个部门内部，按薪水降序排列。
+  - **`ROW_NUMBER()`**：为每个部门内的每行分配一个唯一的连续数字。
+  - **`RANK()`**：如果薪水相同，排名也相同，但下一个不同的薪水会跳过排名（例如 Sales 部门，75000 排名都是 2，但下一个 90000 变成 4）。
+  - **`DENSE_RANK()`**：如果薪水相同，排名也相同，但下一个不同的薪水不会跳过排名（例如 Sales 部门，75000 排名都是 2，下一个 90000 变成 3）。
+
+#### eg3: 使用 `LAG` 和 `LEAD` 比较前后行
+
+```mysql
+SELECT
+    employee_id,
+    department,
+    salary,
+    hire_date,
+    -- 获取当前员工之前入职的员工的薪水 (按部门和入职日期排序)
+    LAG(salary, 1, 0) OVER (PARTITION BY department ORDER BY hire_date ASC) AS prev_employee_salary,
+    -- 获取当前员工之后入职的员工的薪水
+    LEAD(salary, 1, 0) OVER (PARTITION BY department ORDER BY hire_date ASC) AS next_employee_salary
+FROM
+    Employees;
+```
+
+**结果（部分）：**
+
+| **employee_id** | **department** | **salary** | **hire_date** | **prev_employee_salary** | **next_employee_salary** |
+| --------------- | -------------- | ---------- | ------------- | ------------------------ | ------------------------ |
+| 1               | HR             | 60000      | 2020-01-01    | 0                        | 58000                    |
+| 7               | HR             | 58000      | 2020-05-20    | 60000                    | 65000                    |
+| 3               | HR             | 65000      | 2021-06-01    | 58000                    | 0                        |
+| ...             | ...            | ...        | ...           | ...                      | ...                      |
+
+解释：
+
+- `PARTITION BY department ORDER BY hire_date ASC`：在每个部门内部，按入职日期升序排列。
+- `LAG(salary, 1, 0)`：获取前一行的 `salary` 值，如果前一行不存在（即当前行是分区的第一行），则返回 `0`。
+- `LEAD(salary, 1, 0)`：获取后一行的 `salary` 值，如果后一行不存在（即当前行是分区的最后一行），则返回 `0`。
+
+#### eg4: 使用窗口框架进行“滚动求和”
+
+计算每个员工入职当月以及之前所有月份的销售额总和（假设有一个 `Sales` 表）。这里我们用 `Employees` 表的 `salary` 和 `hire_date` 演示“滚动求和”的概念。
+
+```mysql
+SELECT
+    employee_id,
+    department,
+    salary,
+    hire_date,
+    -- 计算从分区开始到当前行（按入职日期排序）的累计薪水
+    SUM(salary) OVER (PARTITION BY department ORDER BY hire_date ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total_salary
+FROM
+    Employees;
+```
+
+**结果（部分）：**
+
+| **employee_id** | **department** | **salary** | **hire_date** | **running_total_salary** |
+| --------------- | -------------- | ---------- | ------------- | ------------------------ |
+| 1               | HR             | 60000      | 2020-01-01    | 60000                    |
+| 7               | HR             | 58000      | 2020-05-20    | 118000                   |
+| 3               | HR             | 65000      | 2021-06-01    | 183000                   |
+| ...             | ...            | ...        | ...           | ...                      |
+
+解释：
+
+- `PARTITION BY department ORDER BY hire_date ASC`：按部门分区，在每个部门内按入职日期排序。
+- `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`：这个窗口框架告诉 `SUM()` 函数，对于每一行，只对其分区内从第一行到当前行的数据进行求和。这就实现了“累计求和”或“滚动求和”。
+
+### 与 `GROUP BY` 的区别
+
+这是理解窗口函数最关键的一点：
+
+| **特性**     | **窗口函数**                                 | **GROUP BY 聚合函数**                             |
+| ------------ | -------------------------------------------- | ------------------------------------------------- |
+| **行数变化** | **不改变原始行数**，为每一行都返回一个结果。 | **减少行数**，将多行数据合并成一行。              |
+| **数据粒度** | 可以在保持原始行粒度的同时，进行分组聚合。   | 只能在聚合后的粒度上进行分析，丢失原始细节。      |
+| **`SELECT`** | 可以和非聚合列、其他普通列一起选择。         | `SELECT` 列表中只能包含 `GROUP BY` 列和聚合函数。 |
+| **应用场景** | 排名、累计计算、前后行比较、分组内比例等。   | 总计、平均、最大/最小、计数等。                   |
+
+------
+
+### 总结
+
+窗口函数是 SQL 数据分析的利器，它弥补了传统聚合函数在保留原始数据细节方面的不足。通过灵活运用 `PARTITION BY`、`ORDER BY` 和窗口框架，你可以完成非常复杂的分析任务，而无需编写冗长且低效的子查询。掌握窗口函数，能大大提升你的 SQL 查询能力。
